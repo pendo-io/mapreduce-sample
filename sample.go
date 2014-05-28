@@ -18,9 +18,11 @@ type sampleUniqueWordCount struct {
 	mapreduce.IntValueHandler
 	mapreduce.BlobIntermediateStorage
 	mapreduce.AppengineTaskQueue
+
+	lineCount int
 }
 
-func (uwc sampleUniqueWordCount) Map(item interface{}) ([]mapreduce.MappedData, error) {
+func (uwc *sampleUniqueWordCount) Map(item interface{}, s mapreduce.StatusUpdateFunc) ([]mapreduce.MappedData, error) {
 	line := item.(string)
 	words := strings.Split(line, " ")
 	result := make([]mapreduce.MappedData, 0, len(words))
@@ -30,10 +32,15 @@ func (uwc sampleUniqueWordCount) Map(item interface{}) ([]mapreduce.MappedData, 
 		}
 	}
 
+	uwc.lineCount++
+	if uwc.lineCount%1000 == 0 {
+		s("mapped line %d", uwc.lineCount)
+	}
+
 	return result, nil
 }
 
-func (uwc sampleUniqueWordCount) Reduce(key interface{}, values []interface{}) (result interface{}, err error) {
+func (uwc *sampleUniqueWordCount) Reduce(key interface{}, values []interface{}, s mapreduce.StatusUpdateFunc) (result interface{}, err error) {
 	return fmt.Sprintf("%s: %d", key, len(values)), nil
 }
 
@@ -43,7 +50,7 @@ func run(w http.ResponseWriter, r *http.Request) {
 	u := sampleUniqueWordCount{}
 
 	job := mapreduce.MapReduceJob{
-		MapReducePipeline: u,
+		MapReducePipeline: &u,
 		Inputs:            mapreduce.FileLineInputReader{[]string{"testdata/pandp-1", "testdata/pandp-2", "testdata/pandp-3", "testdata/pandp-4", "testdata/pandp-5"}},
 		Outputs:           mapreduce.BlobstoreWriter{2},
 		UrlPrefix:         "/mr/test",
