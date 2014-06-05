@@ -40,8 +40,21 @@ func (uwc *sampleUniqueWordCount) Map(item interface{}, s mapreduce.StatusUpdate
 	return result, nil
 }
 
+func (uwc *sampleUniqueWordCount) SetMapParameters(param string) {
+	if param != "expectedParameter" {
+		panic("didn't get parameter in SetMapParameters")
+	}
+}
+
 func (uwc *sampleUniqueWordCount) Reduce(key interface{}, values []interface{}, s mapreduce.StatusUpdateFunc) (result interface{}, err error) {
 	return fmt.Sprintf("%s: %d", key, len(values)), nil
+}
+
+func (uwc *sampleUniqueWordCount) ReduceComplete(mapreduce.StatusUpdateFunc) ([]interface{}, error) {
+	return nil, nil
+}
+
+func (uwc *sampleUniqueWordCount) SetReduceParameters(param string) {
 }
 
 func run(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +68,7 @@ func run(w http.ResponseWriter, r *http.Request) {
 		Outputs:           mapreduce.BlobstoreWriter{2},
 		UrlPrefix:         "/mr/test",
 		OnCompleteUrl:     "/done",
+		JobParameters:     "expectedParameter",
 	}
 
 	if jobId, err := mapreduce.Run(context, job); err != nil {
