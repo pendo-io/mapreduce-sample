@@ -3,7 +3,6 @@ package mapreduce
 import (
 	"appengine"
 	"appengine/blobstore"
-	"appengine/datastore"
 	"fmt"
 	"github.com/pendo-io/mapreduce"
 	"net/http"
@@ -15,7 +14,7 @@ type sampleUniqueWordCount struct {
 	mapreduce.FileLineInputReader
 	mapreduce.BlobstoreWriter
 	mapreduce.StringKeyHandler
-	mapreduce.IntValueHandler
+	mapreduce.Int64ValueHandler
 	mapreduce.BlobIntermediateStorage
 	mapreduce.AppengineTaskQueue
 
@@ -38,6 +37,10 @@ func (uwc *sampleUniqueWordCount) Map(item interface{}, s mapreduce.StatusUpdate
 	}
 
 	return result, nil
+}
+
+func (uwc *sampleUniqueWordCount) MapComplete(mapreduce.StatusUpdateFunc) ([]mapreduce.MappedData, error) {
+	return nil, nil
 }
 
 func (uwc *sampleUniqueWordCount) SetMapParameters(param string) {
@@ -94,13 +97,12 @@ func status(w http.ResponseWriter, r *http.Request) {
 	if idStr := r.FormValue("id"); idStr == "" {
 		fmt.Fprintf(w, "no id given\n")
 		return
-	} else if val, err := strconv.ParseInt(idStr, 10, 64); err != nil {
+	} else if idInt, err := strconv.ParseInt(idStr, 10, 64); err != nil {
 		fmt.Fprintf(w, "bad id\n")
 		return
 	} else {
-		key := datastore.NewKey(context, mapreduce.JobEntity, "", val, nil)
 		var job mapreduce.JobInfo
-		if err := datastore.Get(context, key, &job); err != nil {
+		if job, err = mapreduce.GetJob(context, idInt); err != nil {
 			fmt.Fprintf(w, "failed to load job: %s\n", err)
 			return
 		}
@@ -109,7 +111,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<p>Job Stage: %s\n", job.Stage)
 		if job.Stage == mapreduce.StageDone {
 			fmt.Fprintf(w, "\n")
-			result, err := mapreduce.GetJobResults(context, key)
+			result, err := mapreduce.GetJobResults(context, idInt)
 			if err != nil {
 				fmt.Fprintf(w, "<p>Failed to load task status: %s\n", err)
 			} else {
@@ -120,7 +122,10 @@ func status(w http.ResponseWriter, r *http.Request) {
 				}
 				fmt.Fprintf(w, "</ul>\n")
 			}
+
+			mapreduce.RemoveJob(context, idInt)
 		}
+
 	}
 }
 
@@ -132,4 +137,5 @@ func init() {
 	http.HandleFunc("/done", done)
 	http.HandleFunc("/status", status)
 	http.HandleFunc("/blob/", blob)
+	http.HandleFunc("/console/", mapreduce.ConsoleHandler)
 }
