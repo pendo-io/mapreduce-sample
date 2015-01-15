@@ -66,12 +66,13 @@ func run(w http.ResponseWriter, r *http.Request) {
 	u := sampleUniqueWordCount{}
 
 	job := mapreduce.MapReduceJob{
-		MapReducePipeline: &u,
-		Inputs:            mapreduce.FileLineInputReader{[]string{"testdata/pandp-1", "testdata/pandp-2", "testdata/pandp-3", "testdata/pandp-4", "testdata/pandp-5"}},
-		Outputs:           mapreduce.BlobstoreWriter{2},
-		UrlPrefix:         "/mr/test",
-		OnCompleteUrl:     "/done",
-		JobParameters:     "expectedParameter",
+		MapReducePipeline:   &u,
+		Inputs:              mapreduce.FileLineInputReader{[]string{"testdata/pandp-1", "testdata/pandp-2", "testdata/pandp-3", "testdata/pandp-4", "testdata/pandp-5"}},
+		Outputs:             mapreduce.BlobstoreWriter{2},
+		UrlPrefix:           "/mr/test",
+		OnCompleteUrl:       "/done",
+		SeparateReduceItems: false,
+		JobParameters:       "expectedParameter",
 	}
 
 	if jobId, err := mapreduce.Run(context, job); err != nil {
