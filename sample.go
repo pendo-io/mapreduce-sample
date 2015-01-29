@@ -17,6 +17,7 @@ type sampleUniqueWordCount struct {
 	mapreduce.Int64ValueHandler
 	mapreduce.BlobIntermediateStorage
 	mapreduce.AppengineTaskQueue
+	mapreduce.IgnoreTaskStatusChange
 
 	lineCount int
 }
@@ -112,7 +113,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<p>Job Stage: %s\n", job.Stage)
 		if job.Stage == mapreduce.StageDone {
 			fmt.Fprintf(w, "\n")
-			result, err := mapreduce.GetJobTaskStatus(context, job)
+			result, err := mapreduce.GetJobTaskResults(context, job)
 			if err != nil {
 				fmt.Fprintf(w, "<p>Failed to load task status: %s\n", err)
 			} else {
