@@ -1,10 +1,11 @@
-package mapreduce
+package main
 
 import (
-	"appengine"
-	"appengine/blobstore"
 	"fmt"
+	"github.com/pendo-io/appwrap"
 	"github.com/pendo-io/mapreduce"
+	"google.golang.org/appengine"
+	"google.golang.org/appengine/blobstore"
 	"net/http"
 	"strconv"
 	"strings"
@@ -76,7 +77,9 @@ func run(w http.ResponseWriter, r *http.Request) {
 		JobParameters:       "expectedParameter",
 	}
 
-	if jobId, err := mapreduce.Run(context, job); err != nil {
+	ds := appwrap.NewAppengineDatastore(context)
+
+	if jobId, err := mapreduce.Run(context, ds, job); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	} else {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -89,12 +92,13 @@ func done(w http.ResponseWriter, r *http.Request) {
 
 func blob(w http.ResponseWriter, r *http.Request) {
 	elements := strings.Split(r.URL.Path, "/")
-	blobKey := appengine.BlobKey(elements[len(elements)-1])
+	blobKey := classicae.BlobKey(elements[len(elements)-1])
 	blobstore.Send(w, blobKey)
 }
 
 func status(w http.ResponseWriter, r *http.Request) {
 	context := appengine.NewContext(r)
+	ds := appwrap.NewAppengineDatastore(context)
 
 	if idStr := r.FormValue("id"); idStr == "" {
 		fmt.Fprintf(w, "no id given\n")
@@ -104,7 +108,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		var job mapreduce.JobInfo
-		if job, err = mapreduce.GetJob(context, idInt); err != nil {
+		if job, err = mapreduce.GetJob(ds, idInt); err != nil {
 			fmt.Fprintf(w, "failed to load job: %s\n", err)
 			return
 		}
@@ -113,7 +117,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "<p>Job Stage: %s\n", job.Stage)
 		if job.Stage == mapreduce.StageDone {
 			fmt.Fprintf(w, "\n")
-			result, err := mapreduce.GetJobTaskResults(context, job)
+			result, err := mapreduce.GetJobTaskResults(ds, job)
 			if err != nil {
 				fmt.Fprintf(w, "<p>Failed to load task status: %s\n", err)
 			} else {
@@ -125,13 +129,13 @@ func status(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "</ul>\n")
 			}
 
-			mapreduce.RemoveJob(context, idInt)
+			mapreduce.RemoveJob(ds, idInt)
 		}
 
 	}
 }
 
-func init() {
+func main() {
 	pipeline := sampleUniqueWordCount{}
 
 	http.Handle("/mr/test/", mapreduce.MapReduceHandler("/mr/test", &pipeline, appengine.NewContext))
@@ -140,4 +144,6 @@ func init() {
 	http.HandleFunc("/status", status)
 	http.HandleFunc("/blob/", blob)
 	http.HandleFunc("/console/", mapreduce.ConsoleHandler)
+
+	appengine.Main()
 }
